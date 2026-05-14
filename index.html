@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0d0d">
+<title>GYM TRACKER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & TOKENS ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg:        #0d0d0d;
+  --surface:   #161616;
+  --surface2:  #1f1f1f;
+  --border:    #2c2c2c;
+  --accent:    #d4f53c;
+  --accent2:   #3cf5a8;
+  --red:       #f53c3c;
+  --text:      #f0ece4;
+  --muted:     #5a5a5a;
+  --muted2:    #888;
+  --r:         12px;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-bottom: 110px;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input  { font-family: 'Space Mono', monospace; }
+
+/* ── NOISE TEXTURE ──────────────────────────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── HEADER ─────────────────────────────────────────────────────────────── */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: rgba(13,13,13,.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hdr-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 4px;
+  color: var(--accent);
+  line-height: 1;
+}
+.hdr-meta { text-align: right; }
+.hdr-date { font-size: 11px; color: var(--muted2); text-transform: uppercase; letter-spacing: .5px; }
+.hdr-prog-wrap { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.hdr-prog-bar {
+  width: 90px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.hdr-prog-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 9px;
+  transition: width .4s ease;
+}
+.hdr-prog-pct { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 32px; text-align: right; }
+
+/* ── TABS ───────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  gap: 2px;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex-shrink: 0;
+  padding: 11px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: color .2s, border-color .2s;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab .tab-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent2);
+  margin-left: 5px;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.tab .tab-dot.show { opacity: 1; }
+
+/* ── MAIN CONTENT ───────────────────────────────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn .25s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.content { padding: 16px; max-width: 580px; margin: 0 auto; }
+
+/* ── DAY CARD HEADER ────────────────────────────────────────────────────── */
+.day-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.day-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+.day-focus {
+  font-size: 11px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-top: 4px;
+}
+.day-pct {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+/* ── SECTION LABEL ──────────────────────────────────────────────────────── */
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 20px 0 8px;
+  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── EXERCISE CARD ──────────────────────────────────────────────────────── */
+.ex-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.ex-card.done { border-color: #2c3a1a; }
+.ex-card.done .ex-header { background: #111a08; }
+
+.ex-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.ex-check {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s, border-color .2s;
+}
+.ex-card.done .ex-check { background: var(--accent); border-color: var(--accent); }
+.ex-check-icon { display: none; }
+.ex-card.done .ex-check-icon { display: block; }
+.ex-check-ring { display: block; }
+.ex-card.done .ex-check-ring { display: none; }
+
+.ex-info { flex: 1; min-width: 0; }
+.ex-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ex-card.done .ex-name { color: var(--accent2); }
+.ex-meta {
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 2px;
+  font-family: 'Space Mono', monospace;
+}
+
+.ex-anchor {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent);
+  background: rgba(212,245,60,.1);
+  border: 1px solid rgba(212,245,60,.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.ex-ss {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent2);
+  background: rgba(60,245,168,.1);
+  border: 1px solid rgba(60,245,168,.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.ex-chevron {
+  color: var(--muted);
+  font-size: 14px;
+  transition: transform .3s;
+  flex-shrink: 0;
+}
+.ex-card.open .ex-chevron { transform: rotate(180deg); }
+
+/* ── SETS TABLE ─────────────────────────────────────────────────────────── */
+.sets-wrap { display: none; border-top: 1px solid var(--border); }
+.ex-card.open .sets-wrap { display: block; }
+
+.sets-head {
+  display: grid;
+  grid-template-columns: 32px 64px 1fr auto;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.set-row {
+  display: grid;
+  grid-template-columns: 32px 64px 1fr auto;
+  gap: 8px;
+  padding: 9px 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  transition: background .2s;
+}
+.set-row:last-child { border-bottom: none; }
+.set-row.set-done { background: rgba(212,245,60,.04); }
+.set-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.set-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 8px;
+  width: 100%;
+  text-align: center;
+  -moz-appearance: textfield;
+  transition: border-color .2s;
+}
+.set-input::-webkit-inner-spin-button,
+.set-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.set-input:focus { outline: none; border-color: var(--accent); }
+.set-reps {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--muted2);
+  text-align: center;
+}
+.set-toggle {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s, border-color .2s, color .2s;
+}
+.set-row.set-done .set-toggle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0d0d0d;
+}
+
+/* cardio row */
+.cardio-row {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--muted2);
+  font-family: 'Space Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cardio-row::before { content: '▶'; font-size: 10px; color: var(--accent2); }
+
+/* ── TIMER BAR ──────────────────────────────────────────────────────────── */
+.timer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  z-index: 300;
+  background: rgba(22,22,22,.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+}
+.timer-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.timer-display {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 34px;
+  color: var(--text);
+  letter-spacing: 2px;
+  line-height: 1;
+  min-width: 74px;
+  transition: color .2s;
+}
+.timer-display.running { color: var(--accent); }
+.timer-display.done { color: var(--accent2); }
+.timer-presets {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+.tp {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted2);
+  transition: background .2s, border-color .2s, color .2s;
+}
+.tp.active { background: rgba(212,245,60,.15); border-color: var(--accent); color: var(--accent); }
+.timer-btns { display: flex; gap: 6px; }
+.tb {
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s, color .2s;
+}
+.tb-reset { border: 1px solid var(--border); color: var(--muted2); }
+.tb-reset:active { background: var(--surface2); }
+.tb-play {
+  background: var(--accent);
+  color: #0d0d0d;
+  font-size: 13px;
+}
+.tb-play.running { background: var(--red); color: #fff; }
+
+/* ── HISTORY PAGE ───────────────────────────────────────────────────────── */
+.history-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+.history-empty .big { font-family: 'Bebas Neue', sans-serif; font-size: 64px; color: var(--surface2); }
+
+.hist-day-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.hist-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.hist-day-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+.hist-day-date { font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; }
+.hist-ex-row {
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.hist-ex-row:last-child { border-bottom: none; }
+.hist-ex-name { font-weight: 600; }
+.hist-ex-max {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
+.hist-clear {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+  letter-spacing: .5px;
+  transition: background .2s;
+}
+.hist-clear:active { background: rgba(245,60,60,.1); }
+
+/* ── TOAST ──────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--accent);
+  color: #0d0d0d;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 20px;
+  border-radius: 40px;
+  opacity: 0;
+  transition: opacity .3s, transform .3s;
+  pointer-events: none;
+  z-index: 500;
+  white-space: nowrap;
+  letter-spacing: .5px;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-logo">GYM<br>TRACKER</div>
+  <div class="hdr-meta">
+    <div class="hdr-date" id="hdrDate"></div>
+    <div class="hdr-prog-wrap">
+      <div class="hdr-prog-bar"><div class="hdr-prog-fill" id="hdrFill" style="width:0%"></div></div>
+      <div class="hdr-prog-pct" id="hdrPct">0%</div>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<nav class="tabs" id="tabsEl"></nav>
+
+<!-- PAGES -->
+<div id="pagesEl"></div>
+
+<!-- TIMER -->
+<div class="timer-bar">
+  <div>
+    <div class="timer-label">Descanso</div>
+    <div class="timer-display" id="timerDisp">1:30</div>
+  </div>
+  <div class="timer-presets" id="tpEl"></div>
+  <div class="timer-btns">
+    <button class="tb tb-reset" onclick="resetTimer()" title="Reiniciar">↺</button>
+    <button class="tb tb-play" id="tbPlay" onclick="toggleTimer()">▶</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toastEl"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ROUTINE DATA
+═══════════════════════════════════════════════════════════════════════════ */
+const ROUTINE = {
+  Lunes: {
+    focus: "Pecho · Espalda",
+    sections: [
+      { label: "Calentamiento", exercises: [
+        { name: "Caminadora Zona 2", sets: 1, reps: "10 min", cardio: true }
+      ]},
+      { label: "Estiramiento", exercises: [
+        { name: "Pecho + Dorsal", sets: 1, reps: "2 min", cardio: true }
+      ]},
+      { label: "Fuerza", exercises: [
+        { name: "Press Banca Plano",           sets: 4, reps: 10, anchor: true },
+        { name: "Remo con Barra",              sets: 4, reps: 10, anchor: true },
+        { name: "Press Inclinado (Mancuernas)",sets: 3, reps: 10 },
+        { name: "Jalón al Pecho",              sets: 3, reps: 10 },
+        { name: "Aperturas en Cable",          sets: 3, reps: 12, ss: "A" },
+        { name: "Remo en Polea Baja",          sets: 3, reps: 12, ss: "A" },
+        { name: "Crunch en Máquina",           sets: 3, reps: 15 },
+      ]},
+      { label: "Cardio Final", exercises: [
+        { name: "Elíptica Zona 2", sets: 1, reps: "20 min", cardio: true }
+      ]},
+    ],
+  },
+  Martes: {
+    focus: "Piernas · Cuádriceps",
+    sections: [
+      { label: "Calentamiento", exercises: [
+        { name: "Bicicleta Estática", sets: 1, reps: "10 min", cardio: true }
+      ]},
+      { label: "Estiramiento", exercises: [
+        { name: "Cuádriceps + Cadera", sets: 1, reps: "2 min", cardio: true }
+      ]},
+      { label: "Fuerza", exercises: [
+        { name: "Sentadilla con Barra",        sets: 4, reps: 10, anchor: true },
+        { name: "Prensa de Piernas",           sets: 4, reps: 10, anchor: true },
+        { name: "Extensión de Cuádriceps",     sets: 3, reps: 12 },
+        { name: "Zancada con Mancuernas",      sets: 3, reps: 10 },
+        { name: "Abducción en Máquina",        sets: 3, reps: 15, ss: "A" },
+        { name: "Aducción en Máquina",         sets: 3, reps: 15, ss: "A" },
+        { name: "Pantorrilla en Máquina",      sets: 4, reps: 15 },
+      ]},
+      { label: "Cardio Final", exercises: [
+        { name: "Caminadora Inclinada", sets: 1, reps: "20 min", cardio: true }
+      ]},
+    ],
+  },
+  Miércoles: {
+    focus: "Hombros · Core",
+    sections: [
+      { label: "Calentamiento", exercises: [
+        { name: "Elíptica", sets: 1, reps: "10 min", cardio: true }
+      ]},
+      { label: "Estiramiento", exercises: [
+        { name: "Hombro + Columna", sets: 1, reps: "2 min", cardio: true }
+      ]},
+      { label: "Fuerza", exercises: [
+        { name: "Press Militar de Pie",        sets: 4, reps: 10, anchor: true },
+        { name: "Elevaciones Laterales",       sets: 4, reps: 12 },
+        { name: "Elevaciones Frontales",       sets: 3, reps: 12, ss: "A" },
+        { name: "Pájaros en Cable",            sets: 3, reps: 12, ss: "A" },
+        { name: "Face Pulls",                  sets: 3, reps: 15 },
+        { name: "Plancha",                     sets: 3, reps: "45s" },
+        { name: "Rueda de Ab",                 sets: 3, reps: 10 },
+        { name: "Crunch Bicicleta",            sets: 3, reps: 20 },
+      ]},
+      { label: "Cardio Final", exercises: [
+        { name: "Bicicleta Zona 2", sets: 1, reps: "20 min", cardio: true }
+      ]},
+    ],
+  },
+  Jueves: {
+    focus: "Piernas · Posterior",
+    sections: [
+      { label: "Calentamiento", exercises: [
+        { name: "Bicicleta Inclinada", sets: 1, reps: "10 min", cardio: true }
+      ]},
+      { label: "Estiramiento", exercises: [
+        { name: "Femoral + 90-90", sets: 1, reps: "2 min", cardio: true }
+      ]},
+      { label: "Fuerza", exercises: [
+        { name: "Peso Muerto Rumano",          sets: 4, reps: 10, anchor: true },
+        { name: "Hip Thrust (Máquina)",        sets: 4, reps: 10, anchor: true },
+        { name: "Curl Femoral Acostado",       sets: 3, reps: 10 },
+        { name: "Desplante Hacia Adelante",    sets: 3, reps: 12 },
+        { name: "Abducción en Máquina",        sets: 3, reps: 12, ss: "A" },
+        { name: "Aducción en Máquina",         sets: 3, reps: 12, ss: "A" },
+        { name: "Pantorrilla Rotatoria",       sets: 3, reps: 12 },
+        { name: "Crunch en Máquina",           sets: 3, reps: 15 },
+      ]},
+      { label: "Cardio Final", exercises: [
+        { name: "Caminadora Zona 2", sets: 1, reps: "20 min", cardio: true }
+      ]},
+    ],
+  },
+  Viernes: {
+    focus: "Hombros · Brazo completo",
+    sections: [
+      { label: "Calentamiento", exercises: [
+        { name: "Elíptica", sets: 1, reps: "10 min", cardio: true }
+      ]},
+      { label: "Estiramiento", exercises: [
+        { name: "Hombro + Espalda Baja", sets: 1, reps: "2 min", cardio: true }
+      ]},
+      { label: "Fuerza", exercises: [
+        { name: "Press de Hombro Sentado",     sets: 4, reps: 10, anchor: true },
+        { name: "Curl con Barra (Bíceps)",     sets: 4, reps: 10, anchor: true },
+        { name: "Press Francés (Tríceps)",     sets: 4, reps: 10, anchor: true },
+        { name: "Elevaciones Laterales",       sets: 3, reps: 15 },
+        { name: "Curl Martillo",               sets: 3, reps: 12, ss: "A" },
+        { name: "Extensión Tríceps en Polea",  sets: 3, reps: 12, ss: "A" },
+        { name: "Face Pulls",                  sets: 3, reps: 15 },
+        { name: "Crunch en Máquina",           sets: 3, reps: 15 },
+      ]},
+      { label: "Cardio Final", exercises: [
+        { name: "Elíptica Zona 2", sets: 1, reps: "20 min", cardio: true }
+      ]},
+    ],
+  },
+};
+
+const DAYS = Object.keys(ROUTINE);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATE / STORAGE
+═══════════════════════════════════════════════════════════════════════════ */
+const SK = {
+  data:    'gymtracker_data_v2',
+  hist:    'gymtracker_hist_v2',
+  timerSec:'gymtracker_timer_sec',
+  openExs: 'gymtracker_open_exs',
+};
+
+function load(key, def) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; }
+  catch { return def; }
+}
+function save(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+}
+
+// data[day][exName] = { sets: [ {done, weight} ], allDone: bool }
+let data    = load(SK.data, {});
+let history = load(SK.hist, []);
+let openExs = load(SK.openExs, {});
+
+function getEx(day, name) {
+  if (!data[day]) data[day] = {};
+  if (!data[day][name]) {
+    const ex = findEx(day, name);
+    const n = ex ? ex.sets : 3;
+    data[day][name] = { sets: Array.from({length:n}, () => ({done:false, weight:''})), allDone:false };
+  }
+  return data[day][name];
+}
+function findEx(day, name) {
+  for (const s of ROUTINE[day].sections)
+    for (const e of s.exercises)
+      if (e.name === name) return e;
+  return null;
+}
+function saveData() { save(SK.data, data); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRESS
+═══════════════════════════════════════════════════════════════════════════ */
+function calcDayPct(day) {
+  const exList = ROUTINE[day].sections.flatMap(s => s.exercises.filter(e => !e.cardio));
+  if (!exList.length) return 0;
+  const done = exList.filter(e => getEx(day, e.name).allDone).length;
+  return Math.round((done / exList.length) * 100);
+}
+
+function updateGlobalProgress() {
+  const activeDay = currentDay();
+  const pct = calcDayPct(activeDay);
+  document.getElementById('hdrFill').style.width = pct + '%';
+  document.getElementById('hdrPct').textContent  = pct + '%';
+}
+
+function currentDay() {
+  const t = document.querySelector('.tab.active');
+  return t ? t.dataset.day : DAYS[0];
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUILD UI
+═══════════════════════════════════════════════════════════════════════════ */
+function buildTabs() {
+  const nav = document.getElementById('tabsEl');
+  nav.innerHTML = '';
+  DAYS.forEach((day, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (i === todayIndex() ? ' active' : '');
+    btn.dataset.day = day;
+    btn.innerHTML = `${day.slice(0,3).toUpperCase()}<span class="tab-dot" id="dot_${day}"></span>`;
+    btn.onclick = () => switchTab(day);
+    nav.appendChild(btn);
+  });
+  // History tab
+  const ht = document.createElement('button');
+  ht.className = 'tab';
+  ht.dataset.day = 'HIST';
+  ht.textContent = 'HISTORIAL';
+  ht.onclick = () => switchTab('HIST');
+  nav.appendChild(ht);
+  updateDots();
+}
+
+function todayIndex() {
+  const map = {0:null,1:0,2:1,3:2,4:3,5:4,6:null}; // Mon=1 → index 0
+  const d = new Date().getDay();
+  return map[d] ?? 0;
+}
+
+function buildPages() {
+  const cont = document.getElementById('pagesEl');
+  cont.innerHTML = '';
+
+  DAYS.forEach((day, i) => {
+    const page = document.createElement('div');
+    page.className = 'page' + (i === todayIndex() ? ' active' : '');
+    page.id = 'page_' + day;
+
+    const r = ROUTINE[day];
+    let html = `<div class="content">
+      <div class="day-banner">
+        <div>
+          <div class="day-name">${day}</div>
+          <div class="day-focus">${r.focus}</div>
+        </div>
+        <div class="day-pct" id="dpct_${day}">0%</div>
+      </div>`;
+
+    r.sections.forEach(sec => {
+      html += `<div class="section-label">${sec.label}</div>`;
+      sec.exercises.forEach(ex => {
+        if (ex.cardio) {
+          html += `<div class="cardio-row">${ex.name} — ${ex.reps}</div>`;
+        } else {
+          const id = exId(day, ex.name);
+          const badge = ex.anchor ? `<span class="ex-anchor">ANCLA</span>` : (ex.ss ? `<span class="ex-ss">SS·${ex.ss}</span>` : '');
+          html += `
+          <div class="ex-card" id="${id}">
+            <div class="ex-header" onclick="toggleEx('${day}','${ex.name}')">
+              <div class="ex-check">
+                <svg class="ex-check-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6l3 3 5-5" stroke="#0d0d0d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="ex-check-ring" style="width:10px;height:10px;border-radius:50%;border:2px solid var(--muted);"></div>
+              </div>
+              <div class="ex-info">
+                <div class="ex-name">${ex.name}</div>
+                <div class="ex-meta">${ex.sets} series × ${ex.reps} reps</div>
+              </div>
+              ${badge}
+              <span class="ex-chevron">▾</span>
+            </div>
+            <div class="sets-wrap">
+              <div class="sets-head"><span>#</span><span>KG</span><span>REPS</span><span>✓</span></div>
+              ${buildSetsHTML(day, ex)}
+            </div>
+          </div>`;
+        }
+      });
+    });
+
+    html += `</div>`;
+    page.innerHTML = html;
+    cont.appendChild(page);
+  });
+
+  // History page
+  const histPage = document.createElement('div');
+  histPage.className = 'page';
+  histPage.id = 'page_HIST';
+  histPage.innerHTML = `<div class="content" id="histContent"></div>`;
+  cont.appendChild(histPage);
+}
+
+function buildSetsHTML(day, ex) {
+  const state = getEx(day, ex.name);
+  let html = '';
+  for (let i = 0; i < ex.sets; i++) {
+    const s = state.sets[i];
+    const doneCls = s.done ? 'set-done' : '';
+    html += `
+    <div class="set-row ${doneCls}" id="${setRowId(day, ex.name, i)}">
+      <div class="set-num">${i+1}</div>
+      <input class="set-input" type="number" min="0" max="500" step="2.5"
+        placeholder="—"
+        value="${s.weight || ''}"
+        oninput="setWeight('${day}','${ex.name}',${i},this.value)"
+      >
+      <div class="set-reps">${ex.reps}</div>
+      <button class="set-toggle" onclick="toggleSet('${day}','${ex.name}',${i})">✓</button>
+    </div>`;
+  }
+  return html;
+}
+
+function exId(day, name)         { return 'ex_' + btoa(encodeURIComponent(day+'|'+name)).replace(/[^a-zA-Z0-9]/g,'_'); }
+function setRowId(day, name, i)  { return 'sr_' + btoa(encodeURIComponent(day+'|'+name)).replace(/[^a-zA-Z0-9]/g,'_') + '_' + i; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERACTIONS
+═══════════════════════════════════════════════════════════════════════════ */
+function switchTab(day) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.day === day));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page_' + day));
+  if (day === 'HIST') renderHistory();
+  else updateGlobalProgress();
+}
+
+function toggleEx(day, name) {
+  const id = exId(day, name);
+  const card = document.getElementById(id);
+  const isOpen = card.classList.contains('open');
+  card.classList.toggle('open', !isOpen);
+  openExs[id] = !isOpen;
+  save(SK.openExs, openExs);
+}
+
+function toggleSet(day, name, idx) {
+  const state = getEx(day, name);
+  state.sets[idx].done = !state.sets[idx].done;
+  const allDone = state.sets.every(s => s.done);
+  state.allDone = allDone;
+  saveData();
+
+  // Update row
+  const row = document.getElementById(setRowId(day, name, idx));
+  if (row) row.classList.toggle('set-done', state.sets[idx].done);
+
+  // Update card done state
+  const card = document.getElementById(exId(day, name));
+  if (card) card.classList.toggle('done', allDone);
+
+  // Update day %
+  const pct = calcDayPct(day);
+  const dpct = document.getElementById('dpct_' + day);
+  if (dpct) dpct.textContent = pct + '%';
+  updateGlobalProgress();
+  updateDots();
+
+  if (allDone) { showToast('¡Ejercicio completado! 💪'); autoSaveToHistory(day); }
+
+  // Auto-start timer on set done
+  if (state.sets[idx].done) startTimerAuto();
+}
+
+function setWeight(day, name, idx, val) {
+  const state = getEx(day, name);
+  state.sets[idx].weight = val;
+  saveData();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════════════════════════════════════ */
+function autoSaveToHistory(day) {
+  const dateStr = new Date().toLocaleDateString('es-MX', {weekday:'short', day:'numeric', month:'short'});
+  const exList  = ROUTINE[day].sections.flatMap(s => s.exercises.filter(e => !e.cardio));
+  const entries = exList
+    .map(e => {
+      const s = getEx(day, e.name);
+      const maxW = Math.max(...s.sets.map(x => parseFloat(x.weight)||0));
+      return { name: e.name, maxW: maxW || null, sets: s.sets.filter(x=>x.done).length };
+    })
+    .filter(e => e.sets > 0);
+  if (!entries.length) return;
+
+  // Remove same-day entry if exists
+  history = history.filter(h => !(h.day === day && h.date === dateStr));
+  history.unshift({ day, date: dateStr, ts: Date.now(), entries });
+  if (history.length > 60) history = history.slice(0, 60);
+  save(SK.hist, history);
+}
+
+function renderHistory() {
+  const cont = document.getElementById('histContent');
+  if (!history.length) {
+    cont.innerHTML = `<div class="history-empty"><div class="big">0</div><div>Sin historial aún</div><div style="margin-top:8px;font-size:12px;color:var(--muted)">Completa ejercicios para ver tu progreso aquí</div></div>`;
+    return;
+  }
+  let html = '';
+  history.forEach(h => {
+    html += `<div class="hist-day-block">
+      <div class="hist-day-header">
+        <div class="hist-day-name">${h.day}</div>
+        <div class="hist-day-date">${h.date}</div>
+      </div>`;
+    h.entries.forEach(e => {
+      html += `<div class="hist-ex-row">
+        <span class="hist-ex-name">${e.name}</span>
+        <span class="hist-ex-max">${e.maxW ? e.maxW + ' kg' : '—'} · ${e.sets} series</span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `<button class="hist-clear" onclick="clearHistory()">🗑 Borrar historial completo</button>`;
+  cont.innerHTML = html;
+}
+
+function clearHistory() {
+  if (!confirm('¿Borrar todo el historial?')) return;
+  history = [];
+  save(SK.hist, []);
+  renderHistory();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TIMER
+═══════════════════════════════════════════════════════════════════════════ */
+let timerSec = load(SK.timerSec, 90);
+let timerLeft = timerSec;
+let timerRunning = false;
+let timerInterval = null;
+const PRESETS = [45, 90, 120, 180];
+
+function buildTimerPresets() {
+  const el = document.getElementById('tpEl');
+  el.innerHTML = PRESETS.map(s => {
+    const lbl = s < 60 ? s+'s' : (s/60 === 1 ? '1 min' : (s/60)+'min');
+    return `<button class="tp${s===timerSec?' active':''}" onclick="setPreset(${s})">${lbl}</button>`;
+  }).join('');
+}
+
+function setPreset(s) {
+  timerSec = s;
+  save(SK.timerSec, s);
+  resetTimer();
+  buildTimerPresets();
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), sec = s%60;
+  return m + ':' + String(sec).padStart(2,'0');
+}
+
+function updateTimerDisplay() {
+  const d = document.getElementById('timerDisp');
+  d.textContent = fmtTime(timerLeft);
+  d.className = 'timer-display' + (timerRunning ? ' running' : (timerLeft === 0 ? ' done' : ''));
+}
+
+function startTimerAuto() {
+  if (timerRunning) return;
+  timerLeft = timerSec;
+  timerRunning = true;
+  document.getElementById('tbPlay').classList.add('running');
+  document.getElementById('tbPlay').textContent = '■';
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tickTimer, 1000);
+  updateTimerDisplay();
+}
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('tbPlay').classList.remove('running');
+    document.getElementById('tbPlay').textContent = '▶';
+  } else {
+    if (timerLeft <= 0) timerLeft = timerSec;
+    timerRunning = true;
+    document.getElementById('tbPlay').classList.add('running');
+    document.getElementById('tbPlay').textContent = '■';
+    timerInterval = setInterval(tickTimer, 1000);
+  }
+  updateTimerDisplay();
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerLeft = timerSec;
+  document.getElementById('tbPlay').classList.remove('running');
+  document.getElementById('tbPlay').textContent = '▶';
+  updateTimerDisplay();
+}
+
+function tickTimer() {
+  if (timerLeft <= 0) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('tbPlay').classList.remove('running');
+    document.getElementById('tbPlay').textContent = '▶';
+    updateTimerDisplay();
+    showToast('¡Descanso terminado! 🔥');
+    try { const a = new AudioContext(); const o = a.createOscillator(); const g = a.createGain();
+      o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(0.3,a.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.5); o.start(); o.stop(a.currentTime+0.5); } catch {}
+    return;
+  }
+  timerLeft--;
+  updateTimerDisplay();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOTS & TOAST
+═══════════════════════════════════════════════════════════════════════════ */
+function updateDots() {
+  DAYS.forEach(day => {
+    const dot = document.getElementById('dot_' + day);
+    if (dot) dot.classList.toggle('show', calcDayPct(day) > 0);
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toastEl');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATE HEADER
+═══════════════════════════════════════════════════════════════════════════ */
+function updateHeader() {
+  const d = new Date();
+  document.getElementById('hdrDate').textContent =
+    d.toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'});
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESTORE OPEN STATES
+═══════════════════════════════════════════════════════════════════════════ */
+function restoreOpenStates() {
+  Object.entries(openExs).forEach(([id, open]) => {
+    const el = document.getElementById(id);
+    if (el && open) el.classList.add('open');
+  });
+}
+
+function restoreDoneStates() {
+  DAYS.forEach(day => {
+    const exList = ROUTINE[day].sections.flatMap(s => s.exercises.filter(e => !e.cardio));
+    exList.forEach(ex => {
+      const state = getEx(day, ex.name);
+      // Card done
+      const card = document.getElementById(exId(day, ex.name));
+      if (card) card.classList.toggle('done', state.allDone);
+      // Sets
+      state.sets.forEach((s, i) => {
+        const row = document.getElementById(setRowId(day, ex.name, i));
+        if (row) {
+          row.classList.toggle('set-done', s.done);
+          const inp = row.querySelector('.set-input');
+          if (inp && s.weight) inp.value = s.weight;
+        }
+      });
+    });
+    const dpct = document.getElementById('dpct_' + day);
+    if (dpct) dpct.textContent = calcDayPct(day) + '%';
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════════════ */
+(function init() {
+  updateHeader();
+  buildTabs();
+  buildPages();
+  buildTimerPresets();
+  updateTimerDisplay();
+  restoreOpenStates();
+  restoreDoneStates();
+  updateDots();
+  updateGlobalProgress();
+})();
+</script>
+</body>
+</html>
